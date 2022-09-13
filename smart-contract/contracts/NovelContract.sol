@@ -41,7 +41,7 @@ enum category {
     OTHER
 }
 
-/**@title Novel contract which allow to issue novels in safe and decetralized way
+/**@title Novel contract which allow to issue novels in safe and decentralised way
  * @author Kamil Palenik (xRave110)
  * @dev Based on ERC1155, implements its own URI mapping, Pausable
  */
