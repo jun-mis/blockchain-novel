@@ -8,15 +8,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./NovelContract.sol";
 
-error NotOwner();
-error PriceNotMet(uint256 tokenId, uint256 price);
-error PriceMustBeAboveZero();
-error NotApproved(uint256 tokenId);
+error MarketPlace__NotOwner();
+error MarketPlace__PriceNotMet(uint256 tokenId, uint256 price);
+error MarketPlace__PriceMustBeAboveZero();
+error MarketPlace__NotApproved(uint256 tokenId);
 error ShouldNotApproved(uint256 tokenId);
-error NotListed(uint256 tokenId);
+error MarketPlace__NotListed(uint256 tokenId);
 error AlreadyListed(uint256 tokenId);
-error AlreadySold(uint256 tokenId);
-error BuyerMustNotBeSellor();
+error MarketPlace__AlreadySold(uint256 tokenId);
+error MarketPlace__BuyerMustNotBeSeller();
 
 contract MarketPlace is ReentrancyGuard {
     struct Item {
@@ -68,9 +68,9 @@ contract MarketPlace is ReentrancyGuard {
     }
 
     modifier onlyTokenOwner(uint256 _tokenId) {
-        address tokenOwner = novelContract.ownerOf(_tokenId);
-        if (tokenOwner != msg.sender) {
-            revert NotOwner();
+        uint256 senderBalance = novelContract.balanceOf(msg.sender, _tokenId);
+        if (senderBalance > 0) {
+            revert MarketPlace__NotOwner();
         }
         _;
     }
@@ -78,31 +78,31 @@ contract MarketPlace is ReentrancyGuard {
     modifier isItemListed(uint256 _tokenId) {
         uint256 itemId = tokenIdToItemId[_tokenId];
         if (itemId == 0) {
-            revert NotListed(_tokenId);
+            revert MarketPlace__NotListed(_tokenId);
         }
         _;
     }
 
     modifier isPriceValid(uint256 _price) {
         if (_price == 0) {
-            revert PriceMustBeAboveZero();
+            revert MarketPlace__PriceMustBeAboveZero();
         }
         _;
     }
 
-    modifier isTransferApproved(uint256 _tokenId) {
-        if (novelContract.getApproved(_tokenId) != address(this)) {
-            revert NotApproved(_tokenId);
-        }
-        _;
-    }
+    // modifier isTransferApproved(uint256 _tokenId) {
+    //     if (novelContract.isApprovedForAll(novelContract.tokenIdToItemId[_tokenId]) != address(this)) {
+    //         revert MarketPlace__NotApproved(_tokenId);
+    //     }
+    //     _;
+    // }
 
     function listItem(uint256 _tokenId, uint256 _price)
         external
         onlyTokenOwner(_tokenId)
         isPriceValid(_price)
-        isTransferApproved(_tokenId)
     {
+        //novelContract.setApprovedForAll(address(this), true);
         uint256 itemId = tokenIdToItemId[_tokenId];
         if (itemId != 0) {
             revert AlreadyListed(_tokenId);
@@ -143,10 +143,10 @@ contract MarketPlace is ReentrancyGuard {
         onlyTokenOwner(_tokenId)
         isItemListed(_tokenId)
     {
-        // To make sure this contract can NOT transfer token when it is sold
-        if (novelContract.getApproved(_tokenId) != address(0)) {
-            revert ShouldNotApproved(_tokenId);
-        }
+        // // To make sure this contract can NOT transfer token when it is sold
+        // if (novelContract.getApproved(_tokenId) != address(0)) {
+        //     revert ShouldNotApproved(_tokenId);
+        // }
 
         uint256 itemId = tokenIdToItemId[_tokenId];
 
@@ -160,7 +160,7 @@ contract MarketPlace is ReentrancyGuard {
         external
         payable
         isItemListed(_tokenId)
-        isTransferApproved(_tokenId)
+        //isTransferApproved(_tokenId)
         nonReentrant
     {
         uint256 itemId = tokenIdToItemId[_tokenId];
@@ -168,16 +168,22 @@ contract MarketPlace is ReentrancyGuard {
         Item storage item = items[itemId];
 
         if (msg.value < item.price) {
-            revert PriceNotMet(_tokenId, item.price);
+            revert MarketPlace__PriceNotMet(_tokenId, item.price);
         }
         if (item.isSold) {
-            revert AlreadySold(_tokenId);
+            revert MarketPlace__AlreadySold(_tokenId);
         }
         if (item.seller == msg.sender) {
-            revert BuyerMustNotBeSellor();
+            revert MarketPlace__BuyerMustNotBeSeller();
         }
 
-        novelContract.transferFrom(item.seller, msg.sender, _tokenId);
+        novelContract.safeTransferFrom(
+            item.seller,
+            msg.sender,
+            _tokenId,
+            1,
+            ""
+        );
         item.isSold = true;
 
         uint256 marketFee = calculateFee(item.price);
@@ -188,7 +194,7 @@ contract MarketPlace is ReentrancyGuard {
         emit ItemSold(itemId, _tokenId, msg.sender);
     }
 
-    function calculateFee(uint256 _price) internal view returns (uint256) {
+    function calculateFee(uint256 _price) public view returns (uint256) {
         uint256 fee = ((_price / (1000)) * feePercentage) / (1 ether);
         //uint256 fee = _price(1000).mul(feePercentage.div(1 ether));
 

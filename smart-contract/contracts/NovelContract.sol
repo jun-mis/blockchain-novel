@@ -45,7 +45,7 @@ enum category {
  * @author Kamil Palenik (xRave110)
  * @dev Based on ERC1155, implements its own URI mapping, Pausable
  */
-contract NovelContract is ERC1155 {
+contract NovelContract is ERC1155, Ownable {
     /* Events */
     event NovelCreated(bytes32 indexed novelId, string title);
     event NovelCompleted(bytes32 indexed novelId);
@@ -67,6 +67,7 @@ contract NovelContract is ERC1155 {
     mapping(address => uint256[]) private creatorToTokenIds;
     Novel[] private novels;
     string[] private uris;
+    uint256 transferFee = 0;
 
     /* Modifiers */
     modifier onlyCreator(uint256 _tokenId) {
@@ -106,6 +107,11 @@ contract NovelContract is ERC1155 {
     }
 
     constructor(string memory _uri) ERC1155(_uri) {}
+
+    /**
+     *
+     */
+    function setTransferFee(uint256 _fee) public onlyOwner {}
 
     /**
      *
@@ -151,6 +157,14 @@ contract NovelContract is ERC1155 {
         _setNovelUri(tokenId, _uri);
         //emit NovelCreated(novelHash, _newNovel.title);
     }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) public virtual override {}
 
     function modifyContent(
         uint256 _tokenId,
