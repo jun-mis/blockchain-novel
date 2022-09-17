@@ -14,12 +14,11 @@ const NFT_STORAGE_KEY = process.env.NFT_STORAGE_KEY
  * @param {string} 
  */
 
-async function storeNFT(fullImagePath, title, summary, external_url, category) {
+async function storeNFT(fullImagePath, title, summary, external_url, category, language) {
     console.log(fullImagePath)
 
     console.log("Uploading to IPFS!")
     const image = await fileFromPath(fullImagePath)
-    const name = `Ownly tweet ${tweetId}`
     const nftstorage = new NFTStorage({ token: NFT_STORAGE_KEY })
 
     const response = await nftstorage.store({
@@ -27,7 +26,8 @@ async function storeNFT(fullImagePath, title, summary, external_url, category) {
         name: title,
         description: summary,
         external_url: external_url,
-        attributes: [{ trait_type: 'category', value: category }]
+        attributes: [{ trait_type: 'category', value: category },
+        { trait_type: 'language', value: language }]
         // Currently doesn't support attributes 
     })
     return response
@@ -47,5 +47,5 @@ async function fileFromPath(filePath) {
 }
 
 module.exports = {
-    storeNFTs, storeNFT
+    storeNFT
 }

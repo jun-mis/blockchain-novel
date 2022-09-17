@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+// To be removed import "hardhat/console.sol";
 
 /* Errors */
 error NovelContract__NotAllowedToAddContent(uint256 tokenId);
@@ -19,8 +20,7 @@ error NovelContract__InvalidInput();
 struct Novel {
     uint256 tokenId;
     address creator;
-    category category;
-    string language;
+    string uri;
     bool isCompleted;
     uint256 createdAt;
     uint256 updatedAt;
@@ -47,9 +47,9 @@ enum category {
  */
 contract NovelContract is ERC1155, Ownable {
     /* Events */
-    event NovelCreated(bytes32 indexed novelId, string title);
-    event NovelCompleted(bytes32 indexed novelId);
-    event ContentAdded(bytes32 indexed novelId, uint256 indexed tokenId);
+    event NovelCreated(uint256 indexed tokenId, string uri);
+    event NovelCompleted(uint256 indexed tokenId);
+    event ContentAdded(uint256 indexed tokenId);
 
     /**IPFS storage
      * Name : novel title
@@ -63,10 +63,9 @@ contract NovelContract is ERC1155, Ownable {
      */
 
     /* Blockchain storage */
-    uint256 private tokenId;
     mapping(address => uint256[]) private creatorToTokenIds;
     Novel[] private novels;
-    string[] private uris;
+    mapping(uint256 => string) uris;
     uint256 transferFee = 0;
 
     /* Modifiers */
@@ -116,46 +115,27 @@ contract NovelContract is ERC1155, Ownable {
     /**
      *
      */
-    function createNovel(
-        uint256 _amount,
-        category _category,
-        string memory _language,
-        string memory _uri
-    ) external isNotEmpty(_language) isNotEmpty(_uri) {
-        tokenId++; //novels.length
-        creatorToTokenIds[msg.sender].push(tokenId);
+    function createNovel(uint256 _amount, string memory _uri)
+        external
+        isNotEmpty(_uri)
+    {
+        uint256 tokenId = novels.length;
         // bytes32 novelHash = keccak256(
         //     abi.encodePacked(msg.sender, _amount, tokenId)
         // );
-
         novels.push(
             Novel({
                 tokenId: tokenId, //novels.length
                 creator: msg.sender,
-                category: _category,
-                language: _language, // can be byte arrays
+                uri: _uri,
                 isCompleted: false,
                 createdAt: block.timestamp,
                 updatedAt: block.timestamp
             })
         );
-
-        // NovelContent memory newContent = NovelContent({
-        //     tokenId: tokenId,
-        //     parentId: FIRST_CONTENT_PARENT_ID,
-        //     content: _newNovel.content,
-        //     creator: msg.sender,
-        //     createdAt: block.timestamp
-        // });
-
-        // ??
-        // novelHashToTokenIds[novelHash].push(tokenId);
-
-        // novelHashToIndex[novelHash] = tokenId;
-
         _mint(msg.sender, tokenId, _amount, "");
         _setNovelUri(tokenId, _uri);
-        //emit NovelCreated(novelHash, _newNovel.title);
+        emit NovelCreated(tokenId, _uri);
     }
 
     function safeTransferFrom(
@@ -166,18 +146,16 @@ contract NovelContract is ERC1155, Ownable {
         bytes memory data
     ) public virtual override {}
 
-    function modifyContent(
-        uint256 _tokenId,
-        category _category,
-        string memory _language,
-        string memory _uri
-    ) external onlyCreator(_tokenId) novelNotCompleted(_tokenId) {
+    function modifyContent(uint256 _tokenId, string memory _uri)
+        external
+        onlyCreator(_tokenId)
+        novelNotCompleted(_tokenId)
+    {
         Novel storage novelToModify = novels[_tokenId];
         //How to update metadata ?
-        novelToModify.category = _category;
-        novelToModify.language = _language;
+        novelToModify.uri = _uri;
         novelToModify.updatedAt = block.timestamp;
-        _setNovelUri(tokenId, _uri);
+        _setNovelUri(_tokenId, _uri);
         // NovelContent memory newContent = NovelContent({
         //     tokenId: tokenId,
         //     parentId: _parentId,
@@ -198,21 +176,20 @@ contract NovelContract is ERC1155, Ownable {
         // Novel storage novelToUpdate = novels[novelIndex];
         // novelToUpdate.updatedAt = block.timestamp;
 
-        // emit ContentAdded(_novelId, tokenId);
+        emit ContentAdded(_tokenId);
     }
 
     function completeNovel(uint256 _tokenId) external onlyCreator(_tokenId) {
         novels[_tokenId].isCompleted = true;
+        emit NovelCompleted(_tokenId);
     }
 
     /**
      *
      */
-    function _setNovelUri(uint256 _tokenId, string memory _uri)
-        private
-        onlyCreator(tokenId)
-    {
-        uris[_tokenId] = _uri;
+    function _setNovelUri(uint256 _tokenId, string memory _uri) private {
+        Novel storage novel = novels[_tokenId];
+        novel.uri = _uri;
     }
 
     // function canAddContent(uint256 _tokenId) public view returns (bool) {
